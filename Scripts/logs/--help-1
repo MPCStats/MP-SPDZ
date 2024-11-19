@@ -1,0 +1,2 @@
+Using SPDZ2k security parameter 64
+libc++abi: terminating due to uncaught exception of type file_error: File Error : Missing 'Programs/Schedules/--help.sch'. Did you compile '--help'?

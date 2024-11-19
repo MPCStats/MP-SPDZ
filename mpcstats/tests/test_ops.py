@@ -8,6 +8,8 @@ import pytest, statistics
 
 import mpcstats_lib
 from .lib import execute_elem_filter_test, execute_join_test, execute_stat_func_test, gen_player_data_for_1_param_func, gen_player_data
+from common_lib import execute_computation
+import subprocess
 
 player_data_4x2_2_party = [
     # party 0
@@ -26,12 +28,16 @@ M = mpcstats_lib.MAGIC_NUMBER
 
 TOLERANCE_SMALL = 0.0001  # 0.01%
 
+@pytest.fixture(scope='module')
+def build_vm():
+  semi_party_x = repo_root / 'semi-party.x'
+  if not semi_party_x.exists():
+    subprocess.run(['make', 'semi-party.x'], check=True, cwd=repo_root)
 
 def pd1(col):
     return gen_player_data_for_1_param_func(col, 2, 1)
 
-
-def test_correlation_success():
+def test_correlation_success(build_vm):
     execute_stat_func_test(
         mpcstats_lib.correlation,
         statistics.correlation,
@@ -41,7 +47,7 @@ def test_correlation_success():
         tolerance = 0.02,
     )
 
-def test_covariance_success():
+def test_covariance_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.covariance,
@@ -52,7 +58,7 @@ def test_covariance_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_geometric_mean_success():
+def test_geometric_mean_success(build_vm):
     execute_stat_func_test(
         mpcstats_lib.geometric_mean,
         statistics.geometric_mean,
@@ -62,7 +68,7 @@ def test_geometric_mean_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_median_success():
+def test_median_success(build_vm):
     execute_stat_func_test(
         mpcstats_lib.median,
         statistics.median,
@@ -72,7 +78,7 @@ def test_median_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_where_success():
+def test_where_success(build_vm):
     player_data = [
         [
             [-123, 0, 20, 40],
@@ -117,7 +123,7 @@ def test_where_success():
         [M, M, M, M],
     )
 
-def test_join_success():
+def test_join_success(build_vm):
     # 1. 0 and 3 of col 0 mat 1 match 3 and 0 in col 0 mat 2
     execute_join_test(
         mpcstats_lib.join,
@@ -300,7 +306,7 @@ def test_join_success():
         ],
     )
 
-def test_mode_success():
+def test_mode_success(build_vm):
     test_cases = [
         pd1([11, 99, 100, M]),
         pd1([11, 100, 100, M]),
@@ -329,7 +335,7 @@ def test_mode_success():
         )
 
 @pytest.mark.xfail(raises=IndexError, reason='list index out of range')
-def test_mode_fail_empty_input():
+def test_mode_fail_empty_input(build_vm):
     execute_stat_func_test(
         mpcstats_lib.mode,
         statistics.mode,
@@ -340,7 +346,7 @@ def test_mode_fail_empty_input():
     )
 
 @pytest.mark.xfail(raises=statistics.StatisticsError, reason='no mode for empty data')
-def test_mode_fail_all_magic_numbers():
+def test_mode_fail_all_magic_numbers(build_vm):
     execute_stat_func_test(
         mpcstats_lib.mode,
         statistics.mode,
@@ -350,7 +356,7 @@ def test_mode_fail_all_magic_numbers():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_mean_success():
+def test_mean_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.mean,
@@ -361,7 +367,7 @@ def test_mean_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_variance_success():
+def test_variance_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.variance,
@@ -372,7 +378,7 @@ def test_variance_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_linear_regression_success():
+def test_linear_regression_success(build_vm):
     def vector_res_parser(x):
         return [x.slope, x.intercept]
 
@@ -387,7 +393,7 @@ def test_linear_regression_success():
         vector_res_parser = vector_res_parser,
     )
 
-def test_harmonic_mean_non_zero_input_success():
+def test_harmonic_mean_non_zero_input_success(build_vm):
     # python harmonic_mean doesn't support negative values
     player_data = gen_player_data(30, 2, 2, 1, 100, 0.5)
     execute_stat_func_test(
@@ -399,7 +405,7 @@ def test_harmonic_mean_non_zero_input_success():
         tolerance = 0.005,
     )
 
-def test_harmonic_mean_input_contains_0_success():
+def test_harmonic_mean_input_contains_0_success(build_vm):
     # python harmonic_mean doesn't support negative values
     player_data = gen_player_data(30, 2, 2, 1, 100, 0.5)
     player_data[0][1][0] = 0
@@ -412,7 +418,7 @@ def test_harmonic_mean_input_contains_0_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_pvariance_success():
+def test_pvariance_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.pvariance,
@@ -423,7 +429,7 @@ def test_pvariance_success():
         tolerance = TOLERANCE_SMALL,
     )
 
-def test_pstdev_success():
+def test_pstdev_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.pstdev,
@@ -435,7 +441,7 @@ def test_pstdev_success():
         tolerance = 0.05,
     )
 
-def test_stdev_success():
+def test_stdev_success(build_vm):
     player_data = gen_player_data(30, 2, 2, -100, 100, 0.5)
     execute_stat_func_test(
         mpcstats_lib.stdev,

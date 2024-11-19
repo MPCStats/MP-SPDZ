@@ -7,6 +7,7 @@
 
 #include "Protocols/Rep4.hpp"
 #include "Protocols/Rep4Input.hpp"
+#include "Protocols/Replicated.hpp"
 #include "Protocols/ReplicatedPrep.hpp"
 
 namespace GC
