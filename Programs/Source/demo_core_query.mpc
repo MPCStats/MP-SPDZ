@@ -1,0 +1,78 @@
+# coding: latin-1
+"""
+  Demo to show for DevCon, focusing on client interface, allowing clients to disconnect after giving inputs and reconnect to get output
+  while also allowing servers to store values
+"""
+from typing import Type
+from Compiler.types import sint, regint, Array, MemValue
+from Compiler.library import print_ln, do_while, for_range, accept_client_connection, listen_for_clients, if_, if_e, else_, crash
+from Compiler.instructions import closeclientconnection
+from Compiler.util import if_else
+from Compiler.circuit import sha3_256
+
+sfix.round_nearest = True
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 10
+
+def accept_client():
+    client_socket_id = accept_client_connection(PORTNUM)
+    computationIndex = regint.read_from_socket(client_socket_id)
+    return client_socket_id, computationIndex
+
+def computation(index, client_values):
+    print_ln('comp index: %s', index)
+    result = sint.Array(1)
+    @if_e(index == 0)
+    def _():
+        result[0]=sum(client_values)
+    @else_
+    def _():
+        result[0]=sum(client_values).int_div(sint(2), 10)
+    return result
+    
+
+def main():
+
+    # Start listening for client socket connections
+    listen_for_clients(PORTNUM)
+    print_ln('Listening for client connections on base port %s', PORTNUM)
+
+    client_socket_id, computationIndex = accept_client()
+    print_ln('client_socket_id: %s', client_socket_id)
+    # put as array to make it object
+    # First element is the number of clients
+    client_values = sint.Array(1 + MAX_NUM_CLIENTS)
+    commitment_values = sint.Array(MAX_NUM_CLIENTS)
+
+
+    final_client_values_loc = client_values.read_from_file(0)
+    print_ln('final_client_values_loc: %s', final_client_values_loc.reveal())
+    print_ln('client_values: before update: %s', [client_values[i].reveal() for i in range(MAX_NUM_CLIENTS + 1)])
+    
+    final_commitment_values_loc = commitment_values.read_from_file(final_client_values_loc)
+    print_ln('final_commitment_values_loc: %s', final_commitment_values_loc.reveal())
+    print_ln('commitment_values: before update: %s', [commitment_values[i].reveal() for i in range(MAX_NUM_CLIENTS)])
+    
+    
+    @if_(client_socket_id >= MAX_NUM_CLIENTS)
+    def _():
+        print_ln('client id too high')
+        crash()
+
+    result = computation(computationIndex, client_values)
+
+    
+    print_ln('query computation index: %s is %s', computationIndex, result[0].reveal())
+    
+    #sint.reveal_to_clients([client_socket_id], result)
+    return_array = sint.Array(1+MAX_NUM_CLIENTS)
+    return_array[0] = result[0]
+    @for_range(MAX_NUM_CLIENTS)
+    def _(i):
+        return_array[1+i] = commitment_values[i]
+    
+    return_array.reveal_to_clients([client_socket_id])
+
+    print_ln('Now closing this connection')
+    closeclientconnection(client_socket_id)
+main()

@@ -1,0 +1,108 @@
+# coding: latin-1
+"""
+  Demo to show for DevCon, focusing on client interface, allowing clients to disconnect after giving inputs and reconnect to get output
+  while also allowing servers to store values
+"""
+from typing import Type
+from Compiler.types import sint, regint, Array, MemValue
+from Compiler.library import print_ln, do_while, for_range, accept_client_connection, listen_for_clients, if_, if_e, else_, crash
+from Compiler.instructions import closeclientconnection
+from Compiler.util import if_else
+from Compiler.circuit import sha3_256
+
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 10
+
+def accept_client():
+    client_socket_id = accept_client_connection(PORTNUM)
+    isInput = regint.read_from_socket(client_socket_id)
+    return client_socket_id
+
+def client_input(t: Type[sint], client_socket_id: regint):
+    """
+    Send share of random value, receive input and deduce share.
+    """
+    received = t.receive_from_client(2, client_socket_id)
+    return received[0], sbitvec(received[1], 256)
+
+def calculate_data_commitment(num_bytes_followers: int, followers:sint, delta: sbitvec, encoding: list[sbitvec], nonce: sbitvec):
+    # Adjust based on data_type
+    
+    ASCII_BASE = 48
+    followers_bits_list = []
+    number = followers
+    for i in range(num_bytes_followers):
+        divisor = sint(10**(num_bytes_followers-1-i))
+        curr_digit = number.int_div(divisor, 4*num_bytes_followers)
+        followers_bits_list += [sbit(ele) for ele in sbitvec(curr_digit+ASCII_BASE, 8).v]
+        number = number.int_mod(divisor, 4*num_bytes_followers)
+    
+    active_encoding:list[sbitvec] = []
+    for i in range(len(encoding)):
+        filtered_delta = []
+        for j in range(len(delta)):
+            filtered_delta.append(followers_bits_list[i].if_else(delta[j], sbit(0)))
+        filtered_delta = sbitvec.from_vec(filtered_delta)
+        active_encoding.append(encoding[i].bit_xor(filtered_delta))
+
+
+    concat = nonce.bit_decompose() + sbitvec(sint(num_bytes_followers), 8).bit_decompose()
+    for i in range(len(encoding)):
+        if i%8 ==0:
+            concat = concat + sbitvec(sint(1), 8).bit_decompose()
+        concat = concat+active_encoding[i].bit_decompose()
+    return sha3_256(sbitvec.compose(concat))
+
+def main():
+    # put as array to make it object
+    # First element is the number of clients
+    client_values = sint.Array(1 + MAX_NUM_CLIENTS)
+    commitment_values = sint.Array(MAX_NUM_CLIENTS)
+
+    final_client_values_loc = client_values.read_from_file(0)
+    print_ln('final_client_values_loc: %s', final_client_values_loc.reveal())
+    print_ln('client_values: before update: %s', [client_values[i].reveal() for i in range(MAX_NUM_CLIENTS + 1)])
+    
+    final_commitment_values_loc = commitment_values.read_from_file(final_client_values_loc)
+    print_ln('final_commitment_values_loc: %s', final_commitment_values_loc.reveal())
+    print_ln('commitment_values: before update: %s', [commitment_values[i].reveal() for i in range(MAX_NUM_CLIENTS)])
+    
+    # Start listening for client socket connections
+    listen_for_clients(PORTNUM)
+    print_ln('Listening for client connections on base port %s', PORTNUM)
+
+    client_socket_id = accept_client()
+    print_ln('client_socket_id: %s', client_socket_id)
+
+    @if_(client_socket_id >= MAX_NUM_CLIENTS)
+    def _():
+        print_ln('client id too high')
+        crash()
+
+    input_value, input_nonce = client_input(sint, client_socket_id)
+    client_values[client_socket_id+1] = input_value
+    client_values[0] = client_values[0] + 1
+    client_values.write_to_file(0)
+    print_ln('client_values: after  update: %s', [client_values[i].reveal() for i in range(MAX_NUM_CLIENTS + 1)])
+    
+
+    # these are shared directly to each computation party so can just hardcode
+    input_delta = sbitvec.from_hex('2501fa5c2b50281d97cc4e63bb1beaef')
+    input_zero_encodings = [sbitvec.from_hex(e) for e in ['b51d9f6c1d7133a3c2d307b431c7f3ea', '2842eaaf492880247548f2cb189c2f5b', 'f1844ae7b20ad935605c87878b0ffb96', 'd19b84012adf53dedc896ebb36f7decd', 'e9629218d15b7d0887ffa78c4c70d237', 'd7ce38f06c1b134f30ee3dcd5c947d54', '7e666304dbc6c6a48d270c6d4c71f789', '62a1e68e06fd1d02adeb3646cfb47601']]
+    
+
+    # nonce must be secret_shared
+    # Hardcode 1 as byte of this input
+    input_commitment = calculate_data_commitment(1, input_value, input_delta, input_zero_encodings, input_nonce)
+    print_ln('commitment_0 hex: ')
+    input_commitment.reveal_print_hex()
+
+
+    commitment_values[client_socket_id] = input_commitment
+    commitment_values.write_to_file(1+MAX_NUM_CLIENTS)
+    print_ln('commitment_values: after  update: %s', [commitment_values[i].reveal() for i in range(MAX_NUM_CLIENTS)])
+    sint.reveal_to_clients([client_socket_id],[commitment_values[client_socket_id]])
+    print_ln('Now closing this connection')
+    print_ln('num clients: %s', client_values[0].reveal())
+    closeclientconnection(client_socket_id)
+main()

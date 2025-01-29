@@ -180,6 +180,9 @@ bmr-clean:
 bankers-bonus-client.x: ExternalIO/bankers-bonus-client.o $(COMMON)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
+stats-client.x: ExternalStats/stats-client.o $(COMMON)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
 simple-offline.x: $(FHEOFFLINE)
 pairwise-offline.x: $(FHEOFFLINE)
 cnc-offline.x: $(FHEOFFLINE)

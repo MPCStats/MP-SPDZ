@@ -1,0 +1,28 @@
+# coding: latin-1
+"""
+  Demo to show for DevCon, focusing on client interface, allowing clients to disconnect after giving inputs and reconnect to get output
+  while also allowing servers to store values
+"""
+from typing import Type
+from Compiler.types import sint, regint, Array, MemValue
+from Compiler.library import print_ln, do_while, for_range, accept_client_connection, listen_for_clients, if_, if_e, else_, crash
+from Compiler.instructions import closeclientconnection
+from Compiler.util import if_else
+
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 10
+
+def main():
+    # run this just once at the genesis setting
+    # put as array to make it object
+    # First element is the number of clients
+    client_values = sint.Array(1 + MAX_NUM_CLIENTS)
+    commitment_values = sint.Array(MAX_NUM_CLIENTS)
+
+    print_ln('storing number of values: 0')
+    client_values[0] = sint(0)
+    client_values.write_to_file(0)
+    commitment_values.write_to_file(1+MAX_NUM_CLIENTS)
+    print_ln('Done initiating client_values')
+
+main()

@@ -1,0 +1,178 @@
+# coding: latin-1
+"""
+  Demonstrate clients external to computing parties receiving an authenticated result. See stats-client.cpp for client (and setup instructions).
+  
+  Wait for MAX_NUM_CLIENTS to join the game or client finish flag to be sent
+  before calculating the maximum.
+
+  Note each client connects in a single thread and so is potentially blocked.
+  
+  Each round / game will reset and so this runs indefinitiely.
+"""
+
+from Compiler.types import sint, regint, Array, MemValue, Matrix
+from Compiler.library import print_ln, do_while, for_range
+from Compiler.util import if_else
+
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 8
+n_rounds = 1
+MAGIC_NUMBER = 999
+
+if len(program.args) > 1:
+    n_rounds = int(program.args[1])
+
+if len(program.args) > 2:
+    program.active = bool(int(program.args[2]))
+
+def accept_client():
+    client_socket_id = accept_client_connection(PORTNUM)
+    last = regint.read_from_socket(client_socket_id)
+    return client_socket_id, last
+
+def close_connections(number_clients):
+    @for_range(number_clients)
+    def _(i):
+        closeclientconnection(i)
+
+def client_input(t, client_socket_id):
+    """
+    Send share of random value, receive input and deduce share.
+    """
+    
+    return t.receive_from_client(1, client_socket_id)[0]
+
+def write_winner_to_clients(sockets, number_clients, t, result):
+    """Send share of winning client id to all clients who joined game."""
+
+    # Setup authenticate result using share of random.
+    # client can validate ∑ winning_client_id * ∑ rnd_from_triple = ∑ auth_result
+    t.reveal_to_clients(sockets.get_sub(number_clients), [result])
+
+def join(data1: Matrix, data2: Matrix, data1_column_index: int, data2_column_index: int, t) -> Matrix:
+    """
+    Join two matrices based on the matching index in the specified columns.
+
+    :param data1: The first matrix
+    :param data2: The second matrix
+    :param data1_column_index: The column index in data1 to match with data2_column_index
+    :param data2_column_index: The column index in data2 to match with data1_column_index
+
+    For example, if data1 = [
+        [0, 1, 2, 3],
+        [152, 160, 170, 180]
+    ], data2 = [
+        [3, 0, 4],
+        [50, 60, 70],
+    ], data1_column_index = 0, data2_column_index = 0, then the output will be [
+        [0, 1, 2, 3],
+        [152, 160, 170, 180],
+        [0, MAGIC_NUMBER, MAGIC_NUMBER, 3],
+        [60, MAGIC_NUMBER, MAGIC_NUMBER, 50],
+    ]
+    """
+    # E.g. [2, 4]
+    num_columns_1 = data1.shape[0]
+    num_rows_1 = data1.shape[1]
+
+    # E.g. [2, 3]
+    num_columns_2 = data2.shape[0]
+    num_rows_2 = data2.shape[1]
+
+    new_data = Matrix(num_columns_1 + num_columns_2, num_rows_1, t)
+    # Initialize the first part of the matrix with data1
+    for i in range(num_columns_1):
+        for j in range(num_rows_1):
+            new_data[i][j] = data1[i][j]
+    # Initialize the rest of the matrix with MAGIC_NUMBER
+    for i in range(num_columns_2):
+        for j in range(num_rows_1):
+            new_data[num_columns_2 + i][j] = MAGIC_NUMBER
+
+    # Check the matching index in data1 and data2
+    for i in range(num_rows_1):
+        # Find the corresponding index in data2[data2_column] for data1[data1_column][i]
+        id_in_data1 = data1[data1_column_index][i]
+        for j in range(num_rows_2):
+            # Now checking if data2[data2_column][j] is the same as data1[data1_column][i]
+            id_in_data2 = data2[data2_column_index][j]
+            match = id_in_data1 == id_in_data2
+            # If the match is found, set the entire row of data2[data2_column] to the new_data
+            for k in range(num_columns_2):
+                new_data[num_columns_1 + k][i] = if_else(
+                    match,
+                    data2[k][j],
+                    new_data[num_columns_1 + k][i]
+                )
+    return new_data
+
+def mean(data: list[sfix]):
+    total = sum(if_else(i != MAGIC_NUMBER, i, 0) for i in data)
+    count = sum(if_else(i != MAGIC_NUMBER, 1, 0) for i in data)
+    return total/count
+
+
+def main():
+    """Listen in while loop for players to join a game.
+    Once maxiumum reached or have notified that round finished, run comparison and return result."""
+    # Start listening for client socket connections
+    listen_for_clients(PORTNUM)
+    print_ln('Listening for client connections on base port %s', PORTNUM)
+
+    def game_loop(_=None):
+        print_ln('Starting a new round of the game.')
+
+        # Clients socket id (integer).
+        client_sockets = Array(MAX_NUM_CLIENTS, regint)
+        # Number of clients
+        number_clients = MemValue(regint(0))
+        # Client ids to identity client
+        client_ids = Array(MAX_NUM_CLIENTS, sint)
+        # Keep track of received inputs
+        seen = Array(MAX_NUM_CLIENTS, regint)
+        seen.assign_all(0)
+
+        # Loop round waiting for each client to connect
+        @do_while
+        def client_connections():
+            client_id, last = accept_client()
+            @if_(client_id >= MAX_NUM_CLIENTS)
+            def _():
+                print_ln('client id too high')
+                crash()
+            client_sockets[client_id] = client_id
+            client_ids[client_id] = client_id
+            seen[client_id] = 1
+            @if_(last == 1)
+            def _():
+                number_clients.write(client_id + 1)
+
+            return (sum(seen) < number_clients) + (number_clients == 0)
+
+        def type_run(t):
+            # In file Player-Data/Input-P0-0: 0 1 2 3 170 160 152 180, to resemble example in main.py
+            tensor_0 = t.input_tensor_from(0, [2,4])
+            # In file Player-Data/Input-P1-0: 3 0 4 5 50 60 70 100, to resemble example in main.py
+            tensor_1 = t.input_tensor_from(1, [2,4])
+            join_tensor = join(tensor_0, tensor_1, 0, 0, t)
+            mean_tensor_1 = mean(join_tensor[3])
+            #print_ln('Found mean of joined tensor_1, value is : %s.', mean_tensor_1.reveal())
+
+            write_winner_to_clients(client_sockets, number_clients, t, mean_tensor_1)
+
+        
+        type_run(sfix)
+
+
+        close_connections(number_clients)
+
+        return True
+
+    if n_rounds > 0:
+        print_ln('run %d rounds' % n_rounds)
+        for_range(n_rounds)(game_loop)
+    else:
+        print_ln('run forever')
+        do_while(game_loop)
+
+main()

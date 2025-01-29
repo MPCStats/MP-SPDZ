@@ -1,0 +1,100 @@
+# coding: latin-1
+"""
+  This file is the example for running the server from the already stored 2 client inputs by using read_from_file
+  Demo to show for DevCon, focusing on client interface, allowing clients to disconnect after giving inputs and reconnect to get output
+"""
+
+from Compiler.types import sint, regint, Array, MemValue
+from Compiler.library import print_ln, do_while, for_range
+from Compiler.util import if_else
+
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 8
+
+
+def accept_client():
+    client_socket_id = accept_client_connection(PORTNUM)
+    isInput = regint.read_from_socket(client_socket_id)
+    return client_socket_id, isInput
+
+
+def client_input(t, client_socket_id):
+    """
+    Send share of random value, receive input and deduce share.
+    """
+    return t.receive_from_client(1, client_socket_id)[0]
+
+
+def determine_winner(number_clients, client_values):
+    """Work out and return client_id which corresponds to max client_value"""
+    max_value = Array(1, client_values.value_type)
+    max_value[0] = client_values[0]
+    win_client_id = Array(1, sint)
+    win_client_id[0] = sint(0)
+
+    @for_range(number_clients-1)
+    def loop_body(i):
+        # Is this client input a new maximum, will be sint(1) if true, else sint(0)
+        is_new_max = max_value[0] < client_values[i+1]
+        # Keep latest max_value
+        max_value[0] = if_else(is_new_max, client_values[i+1], max_value[0])
+        # Keep current winning client id
+        win_client_id[0] = if_else(is_new_max, sint(i+1), win_client_id[0])
+
+    #print_ln('maximum: %s', max_value[0].reveal())
+    return win_client_id[0]
+
+
+def main():
+    # Number of clients: continue from previously paused. Now hardcode to 2
+    number_clients = MemValue(cint(2))
+    # Client ids to identify client, read from Persistent...
+    client_values = sint.Array(MAX_NUM_CLIENTS)
+    client_values.read_from_file(0)
+
+    # put as array to make it object
+    winning_client_id = sint.Array(1)
+
+    # print to test read_from_file correctly
+    print_ln('val #0: %s', client_values[0].reveal())
+    print_ln('val #1: %s', client_values[1].reveal())
+
+    # Update winning id
+    winning_client_id[0] = determine_winner(number_clients, client_values)
+
+    # Then the rest just keeps running like demo-client.mpc file
+
+    # Start listening for client socket connections
+    listen_for_clients(PORTNUM)
+    print_ln('Listening for client connections on base port %s', PORTNUM)
+
+    # Loop round waiting for each client to connect
+    @do_while
+    def client_connections():
+        client_id, isInput = accept_client()
+        @if_(client_id >= MAX_NUM_CLIENTS)
+        def _():
+            print_ln('client id too high')
+            crash()
+            
+        @if_e(isInput == 1)
+        def _():
+            # Will not increase number_clients if same client_id, will just update the value
+            number_clients.write(number_clients + (client_id>=number_clients))
+
+            print_ln('Store client inputs.. secret shared')
+            client_values[client_id] = client_input(sint, client_id)
+            sint.write_to_file(client_values[client_id])
+            print_ln('Now closing this connection')
+            closeclientconnection(client_id)
+            print_ln('Calculating New Winning ID.. ')
+            winning_client_id[0] = determine_winner(number_clients, client_values)
+        @else_
+        def _():
+            sint.reveal_to_clients([client_id], [winning_client_id[0]])
+            closeclientconnection(client_id)
+        print_ln('num clients: %s', number_clients.reveal())
+        return True
+    
+    
+main()

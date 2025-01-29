@@ -1,0 +1,103 @@
+# coding: latin-1
+"""
+  Solve Bankers bonus, aka Millionaires problem.
+  to deduce the maximum value from a range of integer input.
+
+  Demonstrate clients external to computing parties supplying input and receiving an authenticated result. See bankers-bonus-client.cpp for client (and setup instructions).
+  
+  Wait for MAX_NUM_CLIENTS to join the game or client finish flag to be sent
+  before calculating the maximum.
+
+  Note each client connects in a single thread and so is potentially blocked.
+  
+  Each round / game will reset and so this runs indefinitiely.
+"""
+
+from Compiler.types import sint, regint, Array, MemValue, Matrix
+from Compiler.library import print_ln, do_while, for_range
+from Compiler.util import if_else
+
+PORTNUM = 14000
+MAX_NUM_CLIENTS = 8
+n_rounds = 1
+n_threads = 2
+MAGIC_NUMBER = 999
+
+
+def join(data1: Matrix, data2: Matrix, data1_column_index: int, data2_column_index: int, t) -> Matrix:
+    """
+    Join two matrices based on the matching index in the specified columns.
+
+    :param data1: The first matrix
+    :param data2: The second matrix
+    :param data1_column_index: The column index in data1 to match with data2_column_index
+    :param data2_column_index: The column index in data2 to match with data1_column_index
+
+    For example, if data1 = [
+        [0, 1, 2, 3],
+        [152, 160, 170, 180]
+    ], data2 = [
+        [3, 0, 4],
+        [50, 60, 70],
+    ], data1_column_index = 0, data2_column_index = 0, then the output will be [
+        [0, 1, 2, 3],
+        [152, 160, 170, 180],
+        [0, MAGIC_NUMBER, MAGIC_NUMBER, 3],
+        [60, MAGIC_NUMBER, MAGIC_NUMBER, 50],
+    ]
+    """
+    # E.g. [2, 4]
+    num_columns_1 = data1.shape[0]
+    num_rows_1 = data1.shape[1]
+
+    # E.g. [2, 3]
+    num_columns_2 = data2.shape[0]
+    num_rows_2 = data2.shape[1]
+
+    new_data = Matrix(num_columns_1 + num_columns_2, num_rows_1, t)
+    # Initialize the first part of the matrix with data1
+    for i in range(num_columns_1):
+        for j in range(num_rows_1):
+            new_data[i][j] = data1[i][j]
+    # Initialize the rest of the matrix with MAGIC_NUMBER
+    for i in range(num_columns_2):
+        for j in range(num_rows_1):
+            new_data[num_columns_2 + i][j] = MAGIC_NUMBER
+
+    # Check the matching index in data1 and data2
+    for i in range(num_rows_1):
+        # Find the corresponding index in data2[data2_column] for data1[data1_column][i]
+        id_in_data1 = data1[data1_column_index][i]
+        for j in range(num_rows_2):
+            # Now checking if data2[data2_column][j] is the same as data1[data1_column][i]
+            id_in_data2 = data2[data2_column_index][j]
+            match = id_in_data1 == id_in_data2
+            # If the match is found, set the entire row of data2[data2_column] to the new_data
+            for k in range(num_columns_2):
+                new_data[num_columns_1 + k][i] = if_else(
+                    match,
+                    data2[k][j],
+                    new_data[num_columns_1 + k][i]
+                )
+    return new_data
+
+def mean(data: list[sfix]):
+    total = sum(if_else(i != MAGIC_NUMBER, i, 0) for i in data)
+    count = sum(if_else(i != MAGIC_NUMBER, 1, 0) for i in data)
+    return total/count
+
+
+def main():
+    def type_run(t):
+        # In file Player-Data/Input-P0-0: 0 1 2 3 170 160 152 180, to resemble example in main.py
+        tensor_0 = t.input_tensor_from(0, [2,4])
+        # In file Player-Data/Input-P1-0: 3 0 4 5 50 60 70 100, to resemble example in main.py
+        tensor_1 = t.input_tensor_from(1, [2,4])
+        join_tensor = join(tensor_0, tensor_1, 0, 0, t)
+        mean_tensor_1 = mean(join_tensor[3])
+        # In case of 3 computing servers without client, and just return value to server 3 (index 2) who does nothing but gets output
+        #print_ln_to(2, 'output for %s: %s', 2, mean_tensor_1.reveal_to(2))
+    
+    type_run(sfix)
+
+main()
