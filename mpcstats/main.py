@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "Scripts"
 # E.g. Scripts/semi.sh testmpc
 LOCAL_EXECUTION_EXE = SCRIPTS_DIR / f"{MPC_PROTOCOL}.sh"
-PLAYER_DATA_DIR = PROJECT_ROOT / "Player-Data"
+PLAYER_DATA_DIR = PROJECT_ROOT / "mpcstats/Player-Data"
 PLAYER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -52,6 +52,7 @@ def prepare_data():
     """
     Save PLAYER_DATA to each party input file.
     """
+    # print_ln("third")
     for party_index, player_data in enumerate(PLAYER_DATA):
         player_data_file = PLAYER_DATA_DIR / f"Input-P{party_index}-0"
         with open(player_data_file, "w") as f:
@@ -62,8 +63,9 @@ def prepare_data():
 
 if __name__ == "__main__":
     # Save PLAYER_DATA to each party input file
+    # print_ln("FIRST")
     prepare_data()
-
+    # print_ln("Second")
     # Computation defined by the user
     def computation():
         # Read all data from all parties
@@ -74,7 +76,7 @@ if __name__ == "__main__":
         print_ln("data_party_0:")
         print_data(matrix_0)
 
-        # 3 0 1 2
+        # 3 0 4 5
         # 50 60 70 80
         data_party_1 = PLAYER_DATA[1]
         matrix_1 = read_data(1, len(data_party_1), len(data_party_1[0]))
@@ -94,8 +96,8 @@ if __name__ == "__main__":
         # [
         #     [0, 1, 2, 3],
         #     [170, 160, 152, 180],
-        #     [0, MAGIC_NUMBER, MAGIC_NUMBER, 3, MAGIC_NUMEBER],
-        #     [60, MAGIC_NUMBER, MAGIC_NUMBER, 50, MAGIC_NUMBER],
+        #     [0, MAGIC_NUMBER, MAGIC_NUMBER, 3],
+        #     [60, MAGIC_NUMBER, MAGIC_NUMBER, 50],
         # ]
         new_data = join(matrix_0, matrix_1, 0, 0)
         print_ln("new_data:")
