@@ -1,3 +1,7 @@
+## Comprehensive skeleton for DevCon Demo
+
+This Folder is used for final draft of DevCon demo flow before migrating to the actual DevCon demo [repo](https://github.com/ZKStats/mpc-demo-infra)
+
 Note that we're working with 256-bit integer, resulting in 320-bit prime number, which is greater than 256 bit. Hence need to write MOD = -DGFP_MOD_SZ=5 into CONFIG.mine
 
 **Test Flow**
