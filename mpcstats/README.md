@@ -1,6 +1,9 @@
 # MPCStats Library
 
+This library allows users to write simple python to calculate stats function using MPC without the need to interact with MP-SPDZ itself. You can see the example in main.py, and all the stats functions implemented in mpcstats_lib.py
+
 ## Installation
+
 Clone the repo.
 
 ```bash
@@ -28,10 +31,13 @@ If you're on macOS and see the following linker warning, you can safely ignore i
 ld: warning: search path '/usr/local/opt/openssl/lib' not found
 ```
 
-## Run
+## Run Example
+
 ```bash
+cd mpcstats
 python main.py
 ```
 
 ## Implementation
+
 Statistics operations implementation is in [mpcstats_lib.py](./mpcstats_lib.py).
