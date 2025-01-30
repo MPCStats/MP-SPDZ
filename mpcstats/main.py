@@ -52,7 +52,7 @@ def prepare_data():
     """
     Save PLAYER_DATA to each party input file.
     """
-    # print_ln("third")
+
     for party_index, player_data in enumerate(PLAYER_DATA):
         player_data_file = PLAYER_DATA_DIR / f"Input-P{party_index}-0"
         with open(player_data_file, "w") as f:
@@ -63,9 +63,7 @@ def prepare_data():
 
 if __name__ == "__main__":
     # Save PLAYER_DATA to each party input file
-    # print_ln("FIRST")
     prepare_data()
-    # print_ln("Second")
     # Computation defined by the user
     def computation():
         # Read all data from all parties
